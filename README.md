@@ -1,14 +1,116 @@
 # korean-asahi
 
-Apple Silicon(M1, 16K 페이지 커널) Debian trixie + KDE Plasma에서 x86_64 앱을
-box64로 돌리는 구성. 두 가지를 스크립트로 재현한다.
+[English](#english) | [한국어](#한국어)
+
+---
+
+## English
+
+Setup scripts for running x86_64 Korean desktop apps with box64 on Apple Silicon
+(M1, 16K-page kernel) Debian trixie + KDE Plasma. Two setups are reproduced:
+
+- **b64wine**: box64 + x86_64/WoW64 Wine → KakaoTalk PC (32-bit, Themida-protected)
+- **hoffice**: box64 + Hancom Office for Linux (amd64 deb) → Hangul/Hword/Hcell/Hshow
+
+Both come with fcitx5 Korean input and KDE menu entries, icons and file associations.
+
+### Usage
+
+```bash
+git clone https://github.com/gg582/korean-asahi.git
+cd korean-asahi
+
+# 1) box64 + Wine + KakaoTalk (builds Wine, takes a while the first time)
+scripts/setup-b64wine.sh
+
+# 2) Hancom Office
+scripts/setup-hoffice.sh
+```
+
+The installers (KakaoTalk installer, Hancom Office deb) are downloaded from each
+vendor's official URL into `downloads/` (not part of the repository). Check
+Hancom's license terms for Hancom Office yourself.
+
+Without arguments every step runs in order. Each step skips work that is already
+done, so re-running is safe, and single steps can be run, e.g.
+`setup-b64wine.sh menus` (step lists are at the top of each script). Steps that
+need sudo (`deps`, `install`) ask for the password.
+
+Launch: "카카오톡", "한글 2022 Beta" etc. in the KDE menu, or double-click a file.
+From a terminal: `b64wine program.exe` (alias), `~/.local/bin/hoffice hwp doc.hwp`.
+
+### What gets installed
+
+| Location | Contents |
+|---|---|
+| `~/.local/opt/box64/bin/box64` | box64 `ac9b13a`, built with `-DM1=ON` (system `/usr/bin/box64` untouched) |
+| `~/.local/opt/wine-box64` | Wine `df15af3` x86_64 + WoW64 (i386), official x86 wine-mono/gecko |
+| `~/.local/opt/llvm-mingw` | PE cross compilers (build only) |
+| `~/builds/` | Wine source, native tools, build tree, amd64 libglvnd sysroot |
+| `~/.wine-b64` | b64wine prefix (separate from the arm64 Wine's `~/.wine`), KakaoTalk |
+| `~/.local/bin/b64wine`, `~/.bashrc` alias | Wine launcher |
+| `~/.box64rc` `[KakaoTalk.exe]` | Vox3.dll workaround (below) |
+| `/opt/hnc/hoffice11` | Hancom Office (extracted from the deb, package not installed) |
+| `~/.local/opt/hoffice-libs` | OpenSSL 1.1, ICU 63 (amd64, from older Debian releases) |
+| `~/.local/bin/hoffice` | Hancom Office launcher |
+| `~/.local/share/{applications,icons,mime}` | menu entries, icons, MIME types, default apps |
+
+### Notes
+
+**KakaoTalk / box64**
+- box64's ARM64 dynarec executes `pop dword [ebp+0x4ec8]` (`8f 85 c8 4e 00 00`,
+  `0x11291abe`) inside `Vox3.dll` (Themida) with a different result than the
+  interpreter, and KakaoTalk dies with `"Vox3.dll" failed to initialize`
+  (confirmed with `BOX64_DYNAREC_TEST`). `~/.box64rc` runs only that 4K page in
+  the interpreter (~30 s to the login window). A KakaoTalk update that changes
+  Vox3.dll may move the address. box64 upstream does not accept AI-written PRs,
+  so report it as an issue if you want it fixed there.
+- The x86_64 DLLs in the system `/usr/share/wine/mono` (arm64 Wine package) are
+  ARM64EC hybrids and crash under box64, so this Wine keeps the official x86
+  wine-mono in its own `share/wine`.
+- Local Wine patch `scripts/patches/wine-winemenubuilder-loader.patch`: makes
+  winemenubuilder write `$WINEMENUBUILDER_LOADER` (b64wine) instead of `wine`
+  into menu entries and file/protocol associations. Without it, KakaoTalk in the
+  menu would start with the system arm64 Wine.
+
+**Hancom Office**
+- The bundled Qt 5.11.3 has no fcitx/XIM plugin, only ibus. With the session's
+  `QT_IM_MODULE=fcitx` it silently falls back to compose and Korean cannot be
+  typed, so the launcher forces `QT_IM_MODULE=ibus` and fcitx5 answers as ibus.
+- Qt's ibus plugin only enables itself when an `ibus-daemon` executable exists in
+  PATH (it is never started), so the `ibus` package is installed (fcitx5 stays the
+  input method). This is why Korean input worked on a real amd64 machine (same
+  deb, ibus package installed, `QT_IM_MODULE=ibus` in the .desktop files).
+- MIME definitions in the deb that redefine standard formats (`*.pdf`, `*.docx`,
+  `*.potx`, `*.thmx`) and re-declarations of standard types are not installed
+  (otherwise PDFs would stop opening in the PDF viewer). Hancom becomes the
+  default app only for Hancom's own formats (hwp/hwpx/cell/show …); docx, xlsx,
+  pptx and pdf keep their existing defaults.
+
+### Environment
+
+Tested on Debian 13 (trixie) arm64, Asahi 16K-page kernel, KDE Plasma (Wayland)
++ fcitx5, MacBook Pro 13" M1. Paths can be changed with environment variables
+(see the top of each script).
+
+### License
+
+MIT (`LICENSE`). The scripts and the investigation were written with AI (Claude)
+assistance. box64, Wine, KakaoTalk and Hancom Office are under their own licenses.
+
+---
+
+## 한국어
+
+Apple Silicon(M1, 16K 페이지 커널) Debian trixie + KDE Plasma에서 x86_64 한국
+데스크톱 앱을 box64로 돌리는 구성. 두 가지를 스크립트로 재현한다.
 
 - **b64wine**: box64 + x86_64/WoW64 Wine → 카카오톡 PC(32비트, Themida 보호)
 - **hoffice**: box64 + 한컴오피스 for Linux(amd64 deb) → 한글/한워드/한셀/한쇼
 
 둘 다 fcitx5 한글 입력, KDE 메뉴·아이콘·파일 연결까지 설정한다.
 
-## 사용
+### 사용
 
 ```bash
 git clone https://github.com/gg582/korean-asahi.git
@@ -33,7 +135,7 @@ scripts/setup-hoffice.sh
 실행: KDE 메뉴의 "카카오톡", "한글 2022 Beta" 등, 또는 파일 더블클릭.
 터미널에서는 `b64wine 프로그램.exe`(alias), `~/.local/bin/hoffice hwp 문서.hwp`.
 
-## 설치되는 것
+### 설치되는 것
 
 | 위치 | 내용 |
 |---|---|
@@ -49,7 +151,7 @@ scripts/setup-hoffice.sh
 | `~/.local/bin/hoffice` | 한컴오피스 실행 래퍼 |
 | `~/.local/share/{applications,icons,mime}` | 메뉴 항목, 아이콘, MIME, 기본 앱 |
 
-## 알아둘 점
+### 알아둘 점
 
 **카카오톡 / box64**
 - `Vox3.dll`(Themida) 안의 `pop dword [ebp+0x4ec8]`(`8f 85 c8 4e 00 00`,
@@ -77,12 +179,12 @@ scripts/setup-hoffice.sh
   기본 앱은 한컴 고유 형식(hwp/hwpx/cell/show …)만 한컴으로, docx/xlsx/pptx/pdf는
   기존 기본 앱 유지.
 
-## 환경
+### 환경
 
 Debian 13 (trixie) arm64, Asahi 16K 페이지 커널, KDE Plasma(Wayland) + fcitx5,
 MacBook Pro 13" M1에서 검증. 경로는 환경 변수로 바꿀 수 있다(각 스크립트 머리말).
 
-## 라이선스
+### 라이선스
 
 MIT (`LICENSE`). 스크립트와 조사는 AI(Claude)의 도움을 받아 작성했다.
 box64, Wine, 카카오톡, 한컴오피스는 각자의 라이선스를 따른다.
