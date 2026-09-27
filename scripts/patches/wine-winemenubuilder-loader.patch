@@ -1,0 +1,41 @@
+--- a/programs/winemenubuilder/winemenubuilder.c
++++ b/programs/winemenubuilder/winemenubuilder.c
+@@ -1206,6 +1206,15 @@
+     return ret;
+ }
+ 
++/* Command written into generated .desktop files to start Wine. Setups that
++ * start Wine through a wrapper (e.g. an emulator such as box64) set
++ * WINEMENUBUILDER_LOADER so the menu entries go through it as well. */
++static const char *wine_loader(void)
++{
++    const char *loader = getenv("WINEMENUBUILDER_LOADER");
++    return (loader && *loader) ? loader : "wine";
++}
++
+ /* This escapes required characters in .desktop files' Exec keys. */
+ static LPSTR escape(LPCWSTR arg)
+ {
+@@ -1276,7 +1285,7 @@
+         fprintf(file, "env \"WINEPREFIX=%s\" ", path);
+         heap_free( path );
+     }
+-    fprintf(file, "wine \"%s\"", escape(path));
++    fprintf(file, "%s \"%s\"", wine_loader(), escape(path));
+     if (args) fprintf(file, " \"%s\"", escape(args) );
+     fputc( '\n', file );
+     fprintf(file, "Type=Application\n");
+@@ -2035,11 +2044,11 @@
+         if (prefix)
+         {
+             char *path = wine_get_unix_file_name( prefix );
+-            fprintf(desktop, "Exec=env \"WINEPREFIX=%s\" wine start ", path);
++            fprintf(desktop, "Exec=env \"WINEPREFIX=%s\" %s start ", path, wine_loader());
+             heap_free( path );
+         }
+         else
+-            fprintf(desktop, "Exec=wine start ");
++            fprintf(desktop, "Exec=%s start ", wine_loader());
+         if (progId) /* file association */
+             fprintf(desktop, "/ProgIDOpen \"%s\" %%f\n", escape(progId));
+         else /* protocol association */

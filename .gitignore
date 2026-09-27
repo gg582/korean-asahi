@@ -1,0 +1,15 @@
+# Installers fetched by the setup scripts (third-party, not redistributable)
+/downloads/
+
+# Local artifacts from earlier attempts
+/build/
+/box64-wine/
+/prefix/
+/bin/
+/box64rc
+/old-desktop/
+/scripts/legacy/
+
+# Temporary files
+*.part
+*.log
